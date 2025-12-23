@@ -3,7 +3,7 @@ package consumer
 import (
 	"context"
 
-	"github.com/bxcodec/goqueue/interfaces"
+	"github.com/turtlepavlo/async-queue-service/interfaces"
 )
 
 // Consumer represents an entity that consumes messages from a queue.

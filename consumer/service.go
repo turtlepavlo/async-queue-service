@@ -1,26 +1,23 @@
 package consumer
 
 import (
-	"github.com/bxcodec/goqueue/internal/consumer"
-	"github.com/bxcodec/goqueue/internal/consumer/rabbitmq"
-	_ "github.com/bxcodec/goqueue/internal/shared" // Auto-setup logging
-	"github.com/bxcodec/goqueue/options"
-	consumerOpts "github.com/bxcodec/goqueue/options/consumer"
+	"github.com/turtlepavlo/async-queue-service/internal/consumer"
+	"github.com/turtlepavlo/async-queue-service/internal/consumer/rabbitmq"
+	_ "github.com/turtlepavlo/async-queue-service/internal/shared" // Auto-setup logging
+	"github.com/turtlepavlo/async-queue-service/options"
+	consumerOpts "github.com/turtlepavlo/async-queue-service/options/consumer"
 )
 
-// NewConsumer creates a new consumer based on the specified platform.
-// It accepts a platform option and additional consumer option functions.
-// It returns a consumer.Consumer interface implementation.
 func NewConsumer(platform options.Platform, opts ...consumerOpts.ConsumerOptionFunc) consumer.Consumer {
 	switch platform {
 	case consumerOpts.ConsumerPlatformRabbitMQ:
 		return rabbitmq.NewConsumer(opts...)
 	case consumerOpts.ConsumerPlatformGooglePubSub:
-		// TODO (bxcodec): implement google pubsub publisher
+		// TODO: implement Google Pub/Sub consumer
 	case consumerOpts.ConsumerPlatformSQS:
-		// TODO (bxcodec): implement sns publisher
+		// TODO: implement SQS consumer
 	default:
-		panic("unknown publisher platform")
+		panic("unknown consumer platform")
 	}
 	return nil
 }

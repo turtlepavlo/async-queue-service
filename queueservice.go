@@ -7,24 +7,20 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
-	"github.com/bxcodec/goqueue/interfaces"
-	"github.com/bxcodec/goqueue/internal/consumer"
-	"github.com/bxcodec/goqueue/internal/publisher"
-	"github.com/bxcodec/goqueue/options"
+	"github.com/turtlepavlo/async-queue-service/interfaces"
+	"github.com/turtlepavlo/async-queue-service/internal/consumer"
+	"github.com/turtlepavlo/async-queue-service/internal/publisher"
+	"github.com/turtlepavlo/async-queue-service/options"
 )
 
-// QueueService represents a service that handles message queuing operations.
+// QueueService is the top-level entry point for consuming and publishing messages.
 type QueueService struct {
-	consumer         consumer.Consumer                // The consumer responsible for consuming messages from the queue.
-	handler          interfaces.InboundMessageHandler // The handler responsible for processing incoming messages.
-	publisher        publisher.Publisher              // The publisher responsible for publishing messages to the queue.
-	NumberOfConsumer int                              // The number of consumers to process messages concurrently.
+	consumer         consumer.Consumer
+	handler          interfaces.InboundMessageHandler
+	publisher        publisher.Publisher
+	NumberOfConsumer int
 }
 
-// NewQueueService creates a new instance of QueueService with the provided options.
-// It accepts a variadic parameter `opts` which allows configuring the QueueService.
-// The options are applied in the order they are provided.
-// Returns a pointer to the created QueueService.
 func NewQueueService(opts ...options.GoQueueOptionFunc) *QueueService {
 	opt := options.DefaultGoQueueOption()
 	for _, o := range opts {
@@ -38,9 +34,8 @@ func NewQueueService(opts ...options.GoQueueOptionFunc) *QueueService {
 	}
 }
 
-// Start starts the queue service by spawning multiple consumers to process messages.
-// It returns an error if the consumer or handler is not defined.
-// The method uses the provided context to manage the lifecycle of the consumers.
+// Start spawns NumberOfConsumer goroutines, each running the consumer loop.
+// Blocks until the context is cancelled or all consumers exit.
 func (qs *QueueService) Start(ctx context.Context) (err error) {
 	if qs.consumer == nil {
 		return errors.New("consumer is not defined")
@@ -63,28 +58,21 @@ func (qs *QueueService) Start(ctx context.Context) (err error) {
 	return g.Wait()
 }
 
-// Stop stops the queue service by stopping the consumer and closing the publisher.
-// It returns an error if there was an issue stopping the consumer or closing the publisher.
 func (qs *QueueService) Stop(ctx context.Context) error {
 	if qs.consumer != nil {
-		err := qs.consumer.Stop(ctx)
-		if err != nil {
+		if err := qs.consumer.Stop(ctx); err != nil {
 			return err
 		}
 	}
-
 	if qs.publisher != nil {
-		err := qs.publisher.Close(ctx)
-		if err != nil {
+		if err := qs.publisher.Close(ctx); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-// Publish publishes a message to the queue.
-// It returns an error if the publisher is not defined or if there was an error while publishing the message.
-func (qs *QueueService) Publish(ctx context.Context, m interfaces.Message) (err error) {
+func (qs *QueueService) Publish(ctx context.Context, m interfaces.Message) error {
 	if qs.publisher == nil {
 		return errors.New("publisher is not defined")
 	}

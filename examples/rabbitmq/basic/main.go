@@ -8,14 +8,14 @@ import (
 
 	amqp "github.com/rabbitmq/amqp091-go"
 
-	"github.com/bxcodec/goqueue"
-	"github.com/bxcodec/goqueue/consumer"
-	"github.com/bxcodec/goqueue/interfaces"
-	"github.com/bxcodec/goqueue/middleware"
-	"github.com/bxcodec/goqueue/options"
-	consumerOpts "github.com/bxcodec/goqueue/options/consumer"
-	publisherOpts "github.com/bxcodec/goqueue/options/publisher"
-	"github.com/bxcodec/goqueue/publisher"
+	"github.com/turtlepavlo/async-queue-service"
+	"github.com/turtlepavlo/async-queue-service/consumer"
+	"github.com/turtlepavlo/async-queue-service/interfaces"
+	"github.com/turtlepavlo/async-queue-service/middleware"
+	"github.com/turtlepavlo/async-queue-service/options"
+	consumerOpts "github.com/turtlepavlo/async-queue-service/options/consumer"
+	publisherOpts "github.com/turtlepavlo/async-queue-service/options/publisher"
+	"github.com/turtlepavlo/async-queue-service/publisher"
 )
 
 func initExchange(ch *amqp.Channel, exchangeName string) error {

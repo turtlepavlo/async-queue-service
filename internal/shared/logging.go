@@ -9,12 +9,7 @@ import (
 
 var loggingSetupOnce sync.Once
 
-// SetupLogging configures zerolog with sensible defaults for goqueue.
-// This function is safe to call multiple times - it will only execute once.
-//
-// It sets:
-// - TimeFieldFormat to Unix timestamp format
-// - ErrorStackMarshaler to include stack traces in error logs
+// SetupLogging configures zerolog defaults (Unix timestamps + stack traces). Runs once.
 func SetupLogging() {
 	loggingSetupOnce.Do(func() {
 		zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
@@ -22,8 +17,7 @@ func SetupLogging() {
 	})
 }
 
-//nolint:gochecknoinits // Required for auto-setup of logging when any goqueue package is imported
+//nolint:gochecknoinits // auto-setup logging when any goqueue package is imported
 func init() {
-	// Automatically setup logging when any goqueue package is imported
 	SetupLogging()
 }

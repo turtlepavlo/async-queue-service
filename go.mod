@@ -1,4 +1,4 @@
-module github.com/bxcodec/goqueue
+module github.com/turtlepavlo/async-queue-service
 
 go 1.24.0
 

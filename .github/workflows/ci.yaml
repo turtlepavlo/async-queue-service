@@ -1,28 +1,61 @@
-name: Unit Testing
+name: CI
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   pull_request:
-    types: [opened, synchronize, reopened]
 
 jobs:
-  build:
-    name: Build and test
+  build-and-test:
+    name: Build & Test
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        go-version: ["oldstable", "stable"]
-    env:
-      VERBOSE: 1
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Set up Go
-        uses: actions/setup-go@v5
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
         with:
-          go-version: ${{ matrix.go-version }}
-      - name: Run tests
-        run: make test
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build
+        run: go build ./...
+
+      - name: Unit tests
+        run: go test -short -race -count=1 ./...
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: v1.64.8
+
+  integration-test:
+    name: Integration Tests (RabbitMQ)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Start RabbitMQ
+        run: |
+          docker compose -f test.compose.yaml up -d
+          sleep 10
+
+      - name: Integration tests
+        env:
+          RABBITMQ_TEST_URL: amqp://test:test@localhost:5672/test
+        run: go test -count=1 -timeout=120s ./...

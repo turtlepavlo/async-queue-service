@@ -3,7 +3,7 @@ package publisher
 import (
 	"context"
 
-	"github.com/bxcodec/goqueue/interfaces"
+	"github.com/turtlepavlo/async-queue-service/interfaces"
 )
 
 // Publisher represents an interface for publishing messages.

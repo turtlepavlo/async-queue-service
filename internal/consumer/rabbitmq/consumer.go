@@ -11,13 +11,13 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/rs/zerolog/log"
 
-	goqueueErrors "github.com/bxcodec/goqueue/errors"
-	headerKey "github.com/bxcodec/goqueue/headers/key"
-	headerVal "github.com/bxcodec/goqueue/headers/value"
-	"github.com/bxcodec/goqueue/interfaces"
-	"github.com/bxcodec/goqueue/internal/consumer"
-	"github.com/bxcodec/goqueue/middleware"
-	consumerOpts "github.com/bxcodec/goqueue/options/consumer"
+	goqueueErrors "github.com/turtlepavlo/async-queue-service/errors"
+	headerKey "github.com/turtlepavlo/async-queue-service/headers/key"
+	headerVal "github.com/turtlepavlo/async-queue-service/headers/value"
+	"github.com/turtlepavlo/async-queue-service/interfaces"
+	"github.com/turtlepavlo/async-queue-service/internal/consumer"
+	"github.com/turtlepavlo/async-queue-service/middleware"
+	consumerOpts "github.com/turtlepavlo/async-queue-service/options/consumer"
 )
 
 const (
@@ -62,11 +62,6 @@ func NewConsumer(
 }
 
 func (r *rabbitMQ) initQueue() {
-	// QueueDeclare declares a queue on the consumer's channel with the specified parameters.
-	// It takes the queue name, durable, autoDelete, exclusive, noWait, and arguments as arguments.
-	// Returns an instance of amqp.Queue and any error encountered.
-	// Please refer to the RabbitMQ documentation for more information on the parameters.
-	// https://www.rabbitmq.com/amqp-0-9-1-reference.html#queue.declare
 	_, err := r.consumerChannel.QueueDeclare(
 		r.option.QueueName,
 		r.option.RabbitMQConsumerConfig.QueueDeclareConfig.Durable,
@@ -93,11 +88,6 @@ func (r *rabbitMQ) initQueue() {
 	}
 }
 
-// initConsumer initializes the consumer for the RabbitMQ instance.
-// It sets the prefetch count, creates a consumer channel, and starts consuming messages from the queue.
-// The consumer tag is generated using the queue name and a unique identifier.
-// It uses manual ack to avoid message loss and allows multiple consumers to access the queue with round-robin message distribution.
-// If an error occurs during the initialization, it logs the error and exits the program.
 func (r *rabbitMQ) initConsumer() {
 	r.tagName = fmt.Sprintf("%s-%s", r.option.QueueName, uuid.New().String())
 	if r.option.ConsumerID != "" {
@@ -127,10 +117,7 @@ func (r *rabbitMQ) initConsumer() {
 		false,
 		// noWait
 		false,
-		// queue arguments
-		// TODO(bxcodec): to support custom queue arguments on consumer initialization
-		// https://github.com/bxcodec/goqueue/issues/1
-		nil,
+		nil, // TODO: support custom queue arguments on consumer init
 	)
 	if err != nil {
 		log.Fatal().Err(err).Msg("error consuming message")
@@ -138,11 +125,9 @@ func (r *rabbitMQ) initConsumer() {
 	r.msgReceiver = receiver
 }
 
-// initRetryModule initializes the retry module for the RabbitMQ consumer.
-// It declares the retry exchange, dead letter exchange, and retry queues.
-// It also binds the dead letter exchange to the original queue and the retry queues to the retry exchange.
+// initRetryModule sets up retry exchanges (topic) and DLX (fanout) with per-retry-count TTL queues.
+// Messages expire via the DLX back into the original queue, implementing delayed retry.
 func (r *rabbitMQ) initRetryModule() {
-	// declare retry exchange
 	err := r.consumerChannel.ExchangeDeclare(
 		r.retryExchangeName,
 		"topic",
@@ -157,7 +142,6 @@ func (r *rabbitMQ) initRetryModule() {
 		log.Fatal().Err(err).Msg("error declaring the retry exchange")
 	}
 
-	// declare dead letter exchange
 	err = r.consumerChannel.ExchangeDeclare(
 		r.retryDeadLetterExchangeName,
 		"fanout",
@@ -184,27 +168,22 @@ func (r *rabbitMQ) initRetryModule() {
 		log.Fatal().Err(err).Msg("error binding the dead letter exchange to the original queue")
 	}
 
-	// declare retry queue
 	for i := int64(1); i <= r.option.MaxRetryFailedMessage; i++ {
-		// declare retry queue
 		_, err = r.consumerChannel.QueueDeclare(
-			getRetryRoutingKey(r.option.QueueName, i), // queue name and routing key is the same for retry queue
+			getRetryRoutingKey(r.option.QueueName, i), // queue name == routing key for retry queues
 			true,
 			false,
 			false,
 			false,
-			amqp.Table{
-				"x-dead-letter-exchange": r.retryDeadLetterExchangeName,
-			},
+			amqp.Table{"x-dead-letter-exchange": r.retryDeadLetterExchangeName},
 		)
 		if err != nil {
 			log.Fatal().Err(err).Msg("error declaring the retry queue")
 		}
 
-		// bind retry queue to retry exchange
 		err = r.consumerChannel.QueueBind(
-			getRetryRoutingKey(r.option.QueueName, i), // queue name and routing key is the same for retry queue
-			getRetryRoutingKey(r.option.QueueName, i), // queue name and routing key is the same for retry queue
+			getRetryRoutingKey(r.option.QueueName, i),
+			getRetryRoutingKey(r.option.QueueName, i),
 			r.retryExchangeName,
 			false,
 			nil,
@@ -215,21 +194,6 @@ func (r *rabbitMQ) initRetryModule() {
 	}
 }
 
-// Consume consumes messages from a RabbitMQ queue and handles them using the provided message handler.
-// It takes a context, an inbound message handler, and a map of metadata as input parameters.
-// The function continuously listens for messages from the queue and processes them until the context is canceled.
-// If the context is canceled, the function stops consuming messages and returns.
-// For each received message, the function builds an inbound message, extracts the retry count,
-// and checks if the maximum retry count has been reached.
-// If the maximum retry count has been reached, the message is moved to the dead letter queue.
-// Otherwise, the message is passed to the message handler for processing.
-// The message handler is responsible for handling the message and returning an error if any.
-// If an error occurs while handling the message, it is logged.
-// The function provides methods for acknowledging, rejecting, and moving messages to the dead letter queue.
-// These methods can be used by the message handler to control the message processing flow.
-// The function also logs information about the received message, such as the message ID, topic, action, and timestamp.
-// It applies any configured middlewares to the message handler before calling it.
-// The function returns an error if any occurred during message handling or if the context was canceled.
 func (r *rabbitMQ) Consume(ctx context.Context,
 	h interfaces.InboundMessageHandler,
 	meta map[string]any) (err error) {
@@ -311,15 +275,11 @@ func (r *rabbitMQ) Consume(ctx context.Context,
 					return
 				},
 				Nack: func(_ context.Context) (err error) {
-					//  receivedMsg.Nack(false, true) => will redelivered again instantly (same with receivedMsg.reject)
-					//  receivedMsg.Nack(false, false) => will put the message to dead letter queue (same with receivedMsg.reject)
-					err = receivedMsg.Nack(false, true)
+					err = receivedMsg.Nack(false, true) // requeue for immediate redelivery
 					return
 				},
 				MoveToDeadLetterQueue: func(_ context.Context) (err error) {
-					//  receivedMsg.Nack(false, true) => will redelivered again instantly (same with receivedMsg.reject)
-					//  receivedMsg.Nack(false, false) => will put the message to dead letter queue (same with receivedMsg.reject)
-					err = receivedMsg.Nack(false, false)
+					err = receivedMsg.Nack(false, false) // drop to DLQ, no requeue
 					return
 				},
 				RetryWithDelayFn: r.requeueMessageWithDLQ(meta, msg, receivedMsg),
@@ -508,9 +468,6 @@ func extractHeaderTime(headers amqp.Table, key string) time.Time {
 	}
 }
 
-// Stop stops the RabbitMQ consumer.
-// It cancels the consumer channel and closes the channel connection.
-// If an error occurs during the cancellation or closing process, it is returned.
 func (r *rabbitMQ) Stop(_ context.Context) (err error) {
 	err = r.consumerChannel.Cancel(r.tagName, false)
 	if err != nil {

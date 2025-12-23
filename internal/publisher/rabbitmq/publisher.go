@@ -8,14 +8,14 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/rs/zerolog/log"
 
-	"github.com/bxcodec/goqueue"
-	"github.com/bxcodec/goqueue/errors"
-	headerKey "github.com/bxcodec/goqueue/headers/key"
-	headerVal "github.com/bxcodec/goqueue/headers/value"
-	"github.com/bxcodec/goqueue/interfaces"
-	"github.com/bxcodec/goqueue/internal/publisher"
-	"github.com/bxcodec/goqueue/middleware"
-	publisherOpts "github.com/bxcodec/goqueue/options/publisher"
+	goqueue "github.com/turtlepavlo/async-queue-service"
+	"github.com/turtlepavlo/async-queue-service/errors"
+	headerKey "github.com/turtlepavlo/async-queue-service/headers/key"
+	headerVal "github.com/turtlepavlo/async-queue-service/headers/value"
+	"github.com/turtlepavlo/async-queue-service/interfaces"
+	"github.com/turtlepavlo/async-queue-service/internal/publisher"
+	"github.com/turtlepavlo/async-queue-service/middleware"
+	publisherOpts "github.com/turtlepavlo/async-queue-service/options/publisher"
 )
 
 const (
@@ -27,32 +27,6 @@ type rabbitMQ struct {
 	option      *publisherOpts.PublisherOption
 }
 
-// NewPublisher creates a new instance of the publisher.Publisher interface
-// using the provided options. It returns a publisher.Publisher implementation
-// that utilizes RabbitMQ as the underlying message broker.
-//
-// The function accepts a variadic parameter `opts` of type
-// `publisherOpts.PublisherOptionFunc`, which allows the caller to provide
-// custom configuration options for the publisher.
-//
-// Example usage:
-//
-//	publisher := NewPublisher(
-//					publisherOpts.PublisherPlatformRabbitMQ,
-//					publisherOpts.WithRabbitMQPublisherConfig(&publisherOpts.RabbitMQPublisherConfig{
-//						Conn:                     rmqConn,
-//						PublisherChannelPoolSize: 5,
-//						}),
-//					publisherOpts.WithPublisherID("publisher_id"),
-//					publisherOpts.WithMiddlewares(
-//						middleware.HelloWorldMiddlewareExecuteBeforePublisher(),
-//						middleware.HelloWorldMiddlewareExecuteAfterPublisher(),
-//					),
-//
-// )
-//
-// The returned publisher can be used to publish messages to the configured
-// RabbitMQ exchange and routing key.
 func NewPublisher(
 	opts ...publisherOpts.PublisherOptionFunc,
 ) publisher.Publisher {
@@ -75,9 +49,6 @@ func NewPublisher(
 	}
 }
 
-// Publish sends a message to the RabbitMQ exchange.
-// It applies the default content type if not specified in the message.
-// It also applies any registered middlewares before publishing the message.
 func (r *rabbitMQ) Publish(ctx context.Context, m interfaces.Message) (err error) {
 	if m.ContentType == "" {
 		m.ContentType = publisherOpts.DefaultContentType
@@ -155,7 +126,6 @@ func (r *rabbitMQ) buildPublisher() interfaces.PublisherFunc {
 	}
 }
 
-// Close will close the connection
 func (r *rabbitMQ) Close(_ context.Context) (err error) {
 	return r.channelPool.Close()
 }

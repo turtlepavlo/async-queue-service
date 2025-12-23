@@ -13,13 +13,13 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/bxcodec/goqueue"
-	headerKey "github.com/bxcodec/goqueue/headers/key"
-	headerVal "github.com/bxcodec/goqueue/headers/value"
-	"github.com/bxcodec/goqueue/interfaces"
-	rmq "github.com/bxcodec/goqueue/internal/publisher/rabbitmq"
-	"github.com/bxcodec/goqueue/options"
-	publisherOpts "github.com/bxcodec/goqueue/options/publisher"
+	goqueue "github.com/turtlepavlo/async-queue-service"
+	headerKey "github.com/turtlepavlo/async-queue-service/headers/key"
+	headerVal "github.com/turtlepavlo/async-queue-service/headers/value"
+	"github.com/turtlepavlo/async-queue-service/interfaces"
+	rmq "github.com/turtlepavlo/async-queue-service/internal/publisher/rabbitmq"
+	"github.com/turtlepavlo/async-queue-service/options"
+	publisherOpts "github.com/turtlepavlo/async-queue-service/options/publisher"
 )
 
 const (

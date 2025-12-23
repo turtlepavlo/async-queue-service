@@ -5,25 +5,17 @@ import (
 	"encoding/json"
 	"sync"
 
-	headerVal "github.com/bxcodec/goqueue/headers/value"
-	"github.com/bxcodec/goqueue/interfaces"
+	headerVal "github.com/turtlepavlo/async-queue-service/headers/value"
+	"github.com/turtlepavlo/async-queue-service/interfaces"
 )
 
-// EncoderFn is a function type that encodes a message into a byte slice.
-// It takes a context and a message as input and returns the encoded data and an error (if any).
 type EncoderFn func(ctx context.Context, m interfaces.Message) (data []byte, err error)
-
-// DecoderFn is a function type that decodes a byte slice into a Message.
-// It takes a context and a byte slice as input and returns a Message and an error.
 type DecoderFn func(ctx context.Context, data []byte) (m interfaces.Message, err error)
 
 var (
-	// JSONEncoder is an implementation of the EncoderFn interface
-	// that encodes a Message into JSON format.
-	JSONEncoder EncoderFn = func(_ context.Context, m interfaces.Message) (data []byte, err error) {
+	JSONEncoder EncoderFn = func(_ context.Context, m interfaces.Message) ([]byte, error) {
 		return json.Marshal(m)
 	}
-	// JSONDecoder is a DecoderFn implementation that decodes JSON data into a Message.
 	JSONDecoder DecoderFn = func(_ context.Context, data []byte) (m interfaces.Message, err error) {
 		err = json.Unmarshal(data, &m)
 		return
@@ -33,22 +25,14 @@ var (
 	DefaultDecoder DecoderFn = JSONDecoder
 )
 
-var (
-	// goQueueEncodingMap is a concurrent-safe map used for encoding in GoQueue.
-	goQueueEncodingMap = sync.Map{}
-)
+var goQueueEncodingMap = sync.Map{}
 
-// AddGoQueueEncoding stores the given encoding for the specified content type in the goQueueEncodingMap.
-// The goQueueEncodingMap is a concurrent-safe map that maps content types to encodings.
-// The content type is specified by the `contentType` parameter, and the encoding is specified by the `encoding` parameter.
-// This function is typically used to register custom encodings for specific content types in the GoQueue library.
+// AddGoQueueEncoding registers a custom encoding for a content type.
+// Must be called before any message with that content type is published.
 func AddGoQueueEncoding(contentType headerVal.ContentType, encoding *Encoding) {
 	goQueueEncodingMap.Store(contentType, encoding)
 }
 
-// GetGoQueueEncoding returns the encoding associated with the given content type.
-// It looks up the encoding in the goQueueEncodingMap and returns it along with a boolean value indicating if the encoding was found.
-// If the encoding is not found, it returns nil and false.
 func GetGoQueueEncoding(contentType headerVal.ContentType) (res *Encoding, ok bool) {
 	if encoding, ok := goQueueEncodingMap.Load(contentType); ok {
 		return encoding.(*Encoding), ok
@@ -56,15 +40,14 @@ func GetGoQueueEncoding(contentType headerVal.ContentType) (res *Encoding, ok bo
 	return nil, false
 }
 
-// Encoding represents an encoding configuration for a specific content type.
+// Encoding pairs an encoder and decoder for a given content type.
 type Encoding struct {
-	ContentType headerVal.ContentType // The content type associated with this encoding.
-	Encode      EncoderFn             // The encoding function used to encode data.
-	Decode      DecoderFn             // The decoding function used to decode data.
+	ContentType headerVal.ContentType
+	Encode      EncoderFn
+	Decode      DecoderFn
 }
 
 var (
-	// JSONEncoding represents the encoding configuration for JSON.
 	JSONEncoding = &Encoding{
 		ContentType: headerVal.ContentTypeJSON,
 		Encode:      JSONEncoder,
@@ -73,7 +56,7 @@ var (
 	DefaultEncoding = JSONEncoding
 )
 
-//nolint:gochecknoinits // Required for auto-registration of default JSON encoding
+//nolint:gochecknoinits // auto-registers JSON encoding on package import
 func init() {
 	AddGoQueueEncoding(JSONEncoding.ContentType, JSONEncoding)
 }
